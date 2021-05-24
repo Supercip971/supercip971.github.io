@@ -6,7 +6,7 @@ body {
     line-height: 1.6;
     font-size: 18px;
     padding: 0 10px;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: monospace;
 }
 
 pre {
