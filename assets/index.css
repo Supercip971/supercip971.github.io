@@ -67,7 +67,7 @@ h1 {
     color: #BAE67E
 }
 
-a {
+a[href] {
     text-decoration: none;
 
     color: #5bcfe6;
