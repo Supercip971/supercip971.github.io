@@ -10,7 +10,7 @@ jobs:
       - name: Install and Build
         run: |
           sudo apt-get install pandoc
-          bash ./python_install_dependencies.
+          bash ./python_install_dependencies.sh
           python create_website.py
 
       - name: Deploy
