@@ -43,6 +43,18 @@ h1 {
     color: #73D0FF
 }
 
+.kw {
+    color: #5bcfe6
+}
+
+.ot {
+    color: #CBCCC6
+}
+
+.er {
+    color: #FFA759
+}
+
 .op {
     color: #CBCCC6
 }

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>
+        How did I created this blog ?
+    </title>
+    <link rel="stylesheet" type="text/css" href="assets/index.css">
+    </link>
+</head>
+
+<body>
+    <h1>
+        How did I created this blog ?
+    </h1><h2 id="objective">Objective</h2>
+<p>when I created this blog, I had some objectives, I wanted a blog:</p>
+<ul>
+<li>open source</li>
+<li>without any JS line</li>
+<li>using markdown</li>
+<li>with a RSS feed</li>
+</ul>
+<p>for this I used python (originally I had planned to use C++ but python simplifies the task a lot).</p>
+<h2 id="why">Why ?</h2>
+<p>I created this blog, to learn how to generate code for a site in python, to get back into python (it’s been 3 years since I last wrote python seriously), because I wanted to learn and have control over how the site is generated.</p>
+<h2 id="markdown-to-html-file-conversion">Markdown to html file conversion</h2>
+<p>for the conversion of markdown files to html I used pandoc (with pypandoc).</p>
+<p>So, to begin with I convert the markdown file to an html file like this:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><a class="sourceLine" id="cb1-1" title="1">pypandoc.convert_file(markdown_file_path, <span class="st">&#39;html&#39;</span>, <span class="bu">format</span><span class="op">=</span><span class="st">&#39;md&#39;</span>)</a></code></pre></div>
+<p>For example for markdown code like this:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode md"><code class="sourceCode markdown"><a class="sourceLine" id="cb2-1" title="1"><span class="fu">## life is cool</span></a>
+<a class="sourceLine" id="cb2-2" title="2">yeah! </a></code></pre></div>
+<p>I would have a pandoc result like this :</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode html"><code class="sourceCode html"><a class="sourceLine" id="cb3-1" title="1"><span class="kw">&lt;h2</span><span class="ot"> id=</span><span class="st">&quot;life-is-cool&quot;</span><span class="kw">&gt;</span>life is cool<span class="kw">&lt;/h2&gt;</span></a>
+<a class="sourceLine" id="cb3-2" title="2"><span class="kw">&lt;p&gt;</span>yeah!<span class="kw">&lt;/p&gt;</span></a></code></pre></div>
+<p>Which is a base for the blog page. Then we need to add html and css code for each page.</p>
+<p>This is what the result may look like:</p>
+<p><img src="./../assets/how_a_blog_post_is_structured.png" /></p>
+<p>So each html file contains the ‘top template’ the ‘markdown code’ and the ‘bottom template’.</p>
+<p>For the moment the creation of the page looks like this: First we open the output file, we write the top template, then we write the markdown html code generated, and so to finish we write the bottom template.</p>
+<p>However we need to configure an article, for example how the blog generator can know the name of the article ? the name of the person who wrote it, the date of writing … ?</p>
+<h2 id="article-configuration">Article configuration</h2>
+<p>For each article there is a configuration file (which has the same name but has a .conf instead of the .md, so for <code>hello.md</code> I would have the config file: <code>hello.conf</code> )</p>
+<p>configuration example:</p>
+<p><em>(note: later I may put json instead of .conf files)</em></p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode conf"><code class="sourceCode ini"><a class="sourceLine" id="cb4-1" title="1"><span class="kw">[info]</span></a>
+<a class="sourceLine" id="cb4-2" title="2"><span class="dt">author </span><span class="ot">=</span><span class="st"> supercyp</span></a>
+<a class="sourceLine" id="cb4-3" title="3"><span class="dt">date </span><span class="ot">=</span><span class="st"> </span><span class="dv">26</span><span class="st"> May </span><span class="dv">2021</span></a>
+<a class="sourceLine" id="cb4-4" title="4"><span class="dt">title </span><span class="ot">=</span><span class="st"> this is the post title</span></a>
+<a class="sourceLine" id="cb4-5" title="5"><span class="dt">resume </span><span class="ot">=</span><span class="st"> this is the resume of the article</span></a></code></pre></div>
+<p>I also use the config file to modify parts of the TOP/BOTTOM TEMPLATE. So for example in the template all <code>24 May 2021</code> will be replaced by the date put in the config file.</p>
+<p>so the code:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode html"><code class="sourceCode html"><a class="sourceLine" id="cb5-1" title="1"><span class="kw">&lt;h5&gt;</span></a>
+<a class="sourceLine" id="cb5-2" title="2">    written by supercyp on 24 May 2021</a>
+<a class="sourceLine" id="cb5-3" title="3"><span class="kw">&lt;/h5&gt;</span></a></code></pre></div>
+<p>will be replace to:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode html"><code class="sourceCode html"><a class="sourceLine" id="cb6-1" title="1"><span class="kw">&lt;h5&gt;</span></a>
+<a class="sourceLine" id="cb6-2" title="2">    written by supercyp on 26 May 2021</a>
+<a class="sourceLine" id="cb6-3" title="3"><span class="kw">&lt;/h5&gt;</span></a></code></pre></div>
+<p>It allows to avoid repeated code and to simplify article writing.</p>
+<p>note: a configuration file is also used for index.html but I will talk about it later.</p>
+<p>So for each item, the generator uses this structure:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode py"><code class="sourceCode python"><a class="sourceLine" id="cb7-1" title="1">title: <span class="bu">str</span></a>
+<a class="sourceLine" id="cb7-2" title="2">writer: <span class="bu">str</span></a>
+<a class="sourceLine" id="cb7-3" title="3">date: <span class="bu">str</span></a>
+<a class="sourceLine" id="cb7-4" title="4">path: <span class="bu">str</span></a>
+<a class="sourceLine" id="cb7-5" title="5">path_ex: <span class="bu">str</span></a>
+<a class="sourceLine" id="cb7-6" title="6">resume: <span class="bu">str</span></a></code></pre></div>
+<p><code>path</code>: the html path relative to create_website.py (./build/post.html)</p>
+<p><code>path_ex</code>: the html path relative to the final website (./post.html)</p>
+<h2 id="the-central-page-of-the-blog">the central page of the blog</h2>
+<p>The page that lists all the articles is structured differently from all the others pages.</p>
+<p><img src="./../assets/how_index_is_structured.png" /></p>
+<p>At each construction of an article page, we add its information to a table, then during the creation of the <code>index.html</code> file, we read the table and we use (for each entry) an ARTICLE_ENTRY_TEMPLATE. for the moment it looks like this:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode html"><code class="sourceCode html"><a class="sourceLine" id="cb8-1" title="1"><span class="kw">&lt;div</span><span class="ot"> class=</span><span class="st">&quot;article_entry&quot;</span><span class="kw">&gt;</span></a>
+<a class="sourceLine" id="cb8-2" title="2">    <span class="kw">&lt;h1&gt;</span></a>
+<a class="sourceLine" id="cb8-3" title="3">        How did I created this blog ?</a>
+<a class="sourceLine" id="cb8-4" title="4">    <span class="kw">&lt;/h1&gt;</span></a>
+<a class="sourceLine" id="cb8-5" title="5">    <span class="kw">&lt;h5&gt;</span></a>
+<a class="sourceLine" id="cb8-6" title="6">        written on 24 May 2021</a>
+<a class="sourceLine" id="cb8-7" title="7">    <span class="kw">&lt;/h5&gt;</span></a>
+<a class="sourceLine" id="cb8-8" title="8">    <span class="kw">&lt;h3&gt;</span></a>
+<a class="sourceLine" id="cb8-9" title="9">        {{resume}}</a>
+<a class="sourceLine" id="cb8-10" title="10">    <span class="kw">&lt;/h3&gt;</span></a>
+<a class="sourceLine" id="cb8-11" title="11">    <span class="kw">&lt;a</span><span class="ot"> href=</span><span class="st">&quot;./{{path}}&quot;</span><span class="kw">&gt;</span>read more<span class="kw">&lt;/a&gt;</span></a>
+<a class="sourceLine" id="cb8-12" title="12"><span class="kw">&lt;/div&gt;</span></a></code></pre></div>
+<p>the generator will fill each information (like: <code>{{resume}}</code>, <code>24 May 2021</code>..) with the article that is in the table entry. (note: {{path}} is the link to the article)</p>
+<p>there is also a page-specific ‘TOP/BOTTOM TEMPLATE’ for the index that uses the configuration file <code>blog_conf.conf</code> for the blog name, link to the about page…</p>
+<h2 id="asset-management">Asset management</h2>
+<p>the management of assets is very simple: during the creation of the blog, all the files in assets are copied into the assets file of the build.</p>
+<p>The ‘asset’ file contains: css files and pictures.</p>
+<h2 id="rss-management">RSS management</h2>
+<p>For the rss feed I used <code>rfeed</code>, I create each post of the feed with the same information given to the index for the creation of the article list (name, summary, link, …)</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Here is a short summary of how I generate this website, I do not think it is perfect and if there is a problem do not hesitate to make an issue or pr! Also, I don’t think the code is the best in the world but if you want to have a look don’t hesitate.</p>
+<h5>
+    written by supercyp on 24 May 2021
+</h5>
+<h6>
+    <a href="index.html">
+        back to index </a>
+</h6>
+
+</body>
+
+</html>
