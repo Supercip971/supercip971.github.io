@@ -31,6 +31,28 @@ pre {
     line-height: 1;
 }
 
+.sourceCode {
+    background-color: #171b24;
+
+    line-height: 1.6;
+    font-size: 14px;
+}
+
+.odd {
+    background-color: #171b24;
+}
+
+
+.header {
+    color: #171b24;
+    background-color: #cbccc6;
+    margin: 5px;
+}
+
+blockquote {
+    background-color: #262f42;
+}
+
 img {
     max-width: 100%;
     padding: 10px 10px 10px 10px;
@@ -84,6 +106,10 @@ h2 {
 
 .im {
     color: #BAE67E
+}
+
+.co {
+    color: #727272
 }
 
 a[href] {
