@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>
+        syscall & sysret
+    </title>
+    <link rel="stylesheet" type="text/css" href="assets/index.css">
+    </link>
+</head>
+
+<body>
+    <h1>
+        syscall & sysret
+    </h1><blockquote>
+<p>note: the article may contain errors, of spellings, codes, or others… if you find one do not hesitate to make an issue or a pr to <a href="https://github.com/Supercip971/supercip971.github.io">github.com/supercip971/supercip971.github.io</a> &lt;3</p>
+</blockquote>
+<h2 id="what-is-a-syscall">What is a syscall ?</h2>
+<p>Syscalls allow to execute kernel actions from userspace. They are like complex <em>functions</em> that link the program and the kernel. For example we can have a syscall to allocate memory, one to open a file… This is an important part of the kernel that needs to be very fast because a user applications can call a lot of syscall.</p>
+<h2 id="what-were-we-doing-before-for-syscalls">What were we doing before for syscalls ?</h2>
+<p>Before (and some are still using it, and it’s still quite effective) we used the interrupts of the cpu: the interrupt allows you to go directly to the kernel by executing specific code pointed in the interrupt table. The <code>int</code> instruction allows to call a certain interrupt, for exemple we can use <code>int 68</code> for calling interrupts number 67. Some os reserve an interruption for the syscall (wingos used interrupt 127, linux use 128…) this interrupt may be the only interrupt that a RING 3 process can call. In the interrupt handler the registers are saved and used as arguments for the syscall.</p>
+<blockquote>
+<p>note: all registers can be used, but RCX and R11 should not be used (if we want to easily make the kernel portable to 64bit syscall/sysret) because they are needed to save the cpu state with the <code>syscall</code> instruction</p>
+</blockquote>
+<p>After the execution of the syscall code in the interrupt, we can modify the value of the RAX register so that it contains the syscall return value.</p>
+<p>However interruptions are slow for syscall. It needs to check a lot of things and it’s not the best solution available.</p>
+<h2 id="before-syscall-sysret-sysenter-sysexit">Before syscall &amp; sysret: sysenter &amp; sysexit</h2>
+<p>Sysenter and Sysexit were added by intel. One problem of sysenter and sysexit in 32Bit is that we don’t know if it is supported. The instruction may not be available. Another problem of sysenter is that you must write for each syscall the return address to RDX and the return stack to RCX, that’s fine but you don’t know what the RIP and RSP of the syscall is !</p>
+<p>The user app must put a return address and a return stack to syscall parameters themselves:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode nasm"><code class="sourceCode nasm"><a class="sourceLine" id="cb1-1" title="1"><span class="fu">sysenter_is_bad_imo:</span></a>
+<a class="sourceLine" id="cb1-2" title="2">    <span class="kw">mov</span> rcx, return_addr</a>
+<a class="sourceLine" id="cb1-3" title="3">    <span class="kw">mov</span> rsi, rsp</a>
+<a class="sourceLine" id="cb1-4" title="4">    <span class="kw">mov</span> rax<span class="bn">, 0x28 </span><span class="co">; just use a random syscall id</span></a>
+<a class="sourceLine" id="cb1-5" title="5">    <span class="kw">sysenter</span></a>
+<a class="sourceLine" id="cb1-6" title="6"></a>
+<a class="sourceLine" id="cb1-7" title="7"><span class="fu">return_addr:</span></a>
+<a class="sourceLine" id="cb1-8" title="8">    <span class="kw">ret</span></a></code></pre></div>
+<p>I think it is sketchy and can be the cause of error. This is my opinion, but I think syscall/sysret are 100 times better than sysenter/sysexit.</p>
+<h2 id="what-is-syscall-sysret">What is syscall &amp; sysret ?</h2>
+<p>First what is syscall &amp; sysret ?</p>
+<p>Syscall and sysret are long mode instruction for doing syscall from userspace to the kernel. These instructions allow you to make faster and safer syscalls. They are faster thanks to the fact that it takes into account that it has consistent segments.</p>
+<h3 id="faster-certainly-but-what-is-the-gain-in-performance">Faster certainly but what is the gain in performance ?</h3>
+<p>I wanted to test on <em>GNU/</em> linux the syscall “Getpid”, with an interrupt and with the syscall instruction (using g++ -O3, and google benchmarks)</p>
+<p>source code:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode cpp"><code class="sourceCode cpp"><a class="sourceLine" id="cb2-1" title="1"><span class="pp">#include </span><span class="im">&lt;benchmark/benchmark.h&gt;</span></a>
+<a class="sourceLine" id="cb2-2" title="2"><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></a>
+<a class="sourceLine" id="cb2-3" title="3"><span class="at">static</span> <span class="dt">void</span> get_pid_syscall_benchmark(benchmark::State&amp; state) {</a>
+<a class="sourceLine" id="cb2-4" title="4">    <span class="cf">for</span> (<span class="kw">auto</span> _ : state) {</a>
+<a class="sourceLine" id="cb2-5" title="5">        <span class="kw">asm</span> <span class="at">volatile</span>( <span class="st">&quot;syscall</span><span class="sc">\n</span><span class="st">&quot;</span>::<span class="st">&quot;a&quot;</span>(<span class="bn">0x27</span>));</a>
+<a class="sourceLine" id="cb2-6" title="6">    }</a>
+<a class="sourceLine" id="cb2-7" title="7">}</a>
+<a class="sourceLine" id="cb2-8" title="8">BENCHMARK(get_pid_syscall_benchmark);</a>
+<a class="sourceLine" id="cb2-9" title="9"></a>
+<a class="sourceLine" id="cb2-10" title="10"><span class="at">static</span> <span class="dt">void</span> get_pid_interrupt_benchmark(benchmark::State&amp; state) {</a>
+<a class="sourceLine" id="cb2-11" title="11">    <span class="cf">for</span> (<span class="kw">auto</span> _ : state) {</a>
+<a class="sourceLine" id="cb2-12" title="12">        <span class="kw">asm</span> <span class="at">volatile</span>(<span class="st">&quot;int $128 </span><span class="sc">\n</span><span class="st">&quot;</span>::<span class="st">&quot;a&quot;</span>(<span class="bn">0x27</span>));</a>
+<a class="sourceLine" id="cb2-13" title="13">    }</a>
+<a class="sourceLine" id="cb2-14" title="14">}</a>
+<a class="sourceLine" id="cb2-15" title="15">BENCHMARK(get_pid_interrupt_benchmark);</a>
+<a class="sourceLine" id="cb2-16" title="16"></a>
+<a class="sourceLine" id="cb2-17" title="17">BENCHMARK_MAIN();</a></code></pre></div>
+<p><strong>here are the results:</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>Benchmark</th>
+<th>Time/CPU</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>get_pid_syscall_benchmark</td>
+<td>62.7 ns</td>
+</tr>
+<tr class="even">
+<td>get_pid_interrupt_benchmark</td>
+<td>132 ns</td>
+</tr>
+</tbody>
+</table>
+<p>the syscall is 2 times faster than the interrupt!</p>
+<p>note: I have a ryzen 5 3600X so results can be differents on other cpu’s and systems</p>
+<p>however setting up a syscall is a bit more complicated than setting up a syscall with an interrupt:</p>
+<p>first you need to turn them on with model specific register (address 0xC0000080 bit 0)</p>
+<p>then you need to setup syscall gdt segments:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode cpp"><code class="sourceCode cpp"><a class="sourceLine" id="cb3-1" title="1">x86_wrmsr(STAR, ((<span class="dt">uint64_t</span>)SELECTOR_1 &lt;&lt; <span class="dv">32</span>) | ((<span class="dt">uint64_t</span>)(SELECTOR_2 | <span class="dv">3</span>) &lt;&lt; <span class="dv">48</span>));</a></code></pre></div>
+<p>it is necessary to know that the MSR STAR register must contain the segment when the syscall is executed (ring 0) and the segment when the syscall is exited (ring 3) but it is also important that the gdt entry has a precise order:</p>
+<ul>
+<li>SELECTOR_1 : must be kernel code</li>
+<li>SELECTOR_1 + 8 : must be kernel data</li>
+<li>SELECTOR_2 + 8 : must be user data</li>
+<li>SELECTOR_2 + 16 : must be user code</li>
+</ul>
+<p>So in wingos I changed the order of the gdt to have: - 0 null_segment - 8 kernel_code - 16 kernel_data - 24 user_data - 32 user_code</p>
+<p>I can have SELECTOR_1 = kernel code and SELECTOR_2 = kernel data | 3</p>
+<p>It’s maybe weird but it’s one of the only solution I found except if I make an empty entry between KERNEL_DATA and USER_DATA.</p>
+<p>Then you have to load the address of the syscall handler in the LSTAR register.</p>
+<h4 id="the-syscall-handler"><strong>The syscall handler</strong>:</h4>
+<p>Before talking about the syscall handler I should tell you that in 64bit and with smp, there is a local structure for each cpu stored in the gs register (other kernels can use fs). This structure contains a temporary stack for the syscall, an address to store the process stack temporarily (and maybe other things…).</p>
+<p>the local cpu structure stored in gs:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode cpp"><code class="sourceCode cpp"><a class="sourceLine" id="cb4-1" title="1"><span class="kw">class</span> cpu</a>
+<a class="sourceLine" id="cb4-2" title="2">{</a>
+<a class="sourceLine" id="cb4-3" title="3"><span class="kw">public</span>:</a>
+<a class="sourceLine" id="cb4-4" title="4">    <span class="dt">uint8_t</span> *syscall_stack; <span class="co">// the stack for the syscall</span></a>
+<a class="sourceLine" id="cb4-5" title="5">    <span class="dt">uint64_t</span> saved_stack; <span class="co">// an address for saving the current process stack</span></a>
+<a class="sourceLine" id="cb4-6" title="6">    <span class="co">// ... other data like cpu id, current idt tss and other value</span></a>
+<a class="sourceLine" id="cb4-7" title="7">};</a></code></pre></div>
+<p>So at each syscall we change the stack temporarily to use the syscall_stack.</p>
+<p>But in 64bit a user can write to the gs register (with <code>wrgsbase</code>)! which can really be problematic… So we use the instruction:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode nasm"><code class="sourceCode nasm"><a class="sourceLine" id="cb5-1" title="1"><span class="kw">swapgs</span></a></code></pre></div>
+<p>Which allows to change between user gs and the gs which is stored in the msr register: <code>KERNEL_GS</code> so we can ‘secure’ the use of the gs register. At the end of the syscall_handle we can call swapgs again to reset to the previous value of gs.</p>
+<p>Also when entering the syscall_handle, the cpu puts the previous value of RIP in RCX and the previous value of RFLAGS in R11. The processor also uses them to reset the value of RIP and RFLAGS when the syscall returns.</p>
+<p>Here is my sycall handler:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode nasm"><code class="sourceCode nasm"><a class="sourceLine" id="cb6-1" title="1"><span class="fu">syscall_handle:</span></a>
+<a class="sourceLine" id="cb6-2" title="2">    <span class="kw">swapgs</span></a>
+<a class="sourceLine" id="cb6-3" title="3">    <span class="kw">mov</span> [<span class="kw">gs</span>:<span class="bn">0x8</span>], rsp       <span class="co">; gs.saved_stack = rsp</span></a>
+<a class="sourceLine" id="cb6-4" title="4">    <span class="kw">mov</span> rsp, [<span class="kw">gs</span>:<span class="bn">0x0</span>]       <span class="co">; rsp = gs.syscall_stack </span></a>
+<a class="sourceLine" id="cb6-5" title="5"></a>
+<a class="sourceLine" id="cb6-6" title="6">    <span class="co">; push information (gs, cs, rip, rflags, rip...)</span></a>
+<a class="sourceLine" id="cb6-7" title="7">    <span class="kw">push</span> <span class="dt">qword</span><span class="bn"> 0x1b         </span><span class="co">; user data segment</span></a>
+<a class="sourceLine" id="cb6-8" title="8">    <span class="kw">push</span> <span class="dt">qword</span> [<span class="kw">gs</span>:<span class="bn">0x8</span>]     <span class="co">; saved stack</span></a>
+<a class="sourceLine" id="cb6-9" title="9">    <span class="kw">push</span> r11                <span class="co">; saved rflags</span></a>
+<a class="sourceLine" id="cb6-10" title="10">    <span class="kw">push</span> <span class="dt">qword</span><span class="bn"> 0x23         </span><span class="co">; user code segment </span></a>
+<a class="sourceLine" id="cb6-11" title="11">    <span class="kw">push</span> rcx                <span class="co">; current RIP</span></a>
+<a class="sourceLine" id="cb6-12" title="12"></a>
+<a class="sourceLine" id="cb6-13" title="13">    push_all                <span class="co">; push every register</span></a>
+<a class="sourceLine" id="cb6-14" title="14"></a>
+<a class="sourceLine" id="cb6-15" title="15">    <span class="kw">mov</span> rdi, rsp            <span class="co">; put the stackframe as the syscall argument</span></a>
+<a class="sourceLine" id="cb6-16" title="16">    <span class="kw">mov</span> rbp, <span class="dv">0</span></a>
+<a class="sourceLine" id="cb6-17" title="17">    <span class="kw">call</span> syscall_higher_handler <span class="co">; jump to beautiful higher level code</span></a>
+<a class="sourceLine" id="cb6-18" title="18"></a>
+<a class="sourceLine" id="cb6-19" title="19">    pop_all_syscall         <span class="co">; pop every register except RAX as we use it for the return value</span></a>
+<a class="sourceLine" id="cb6-20" title="20"></a>
+<a class="sourceLine" id="cb6-21" title="21">    <span class="kw">mov</span> rsp, [<span class="kw">gs</span>:<span class="bn">0x8</span>]</a>
+<a class="sourceLine" id="cb6-22" title="22">    <span class="kw">swapgs</span></a>
+<a class="sourceLine" id="cb6-23" title="23">    <span class="kw">sti</span></a>
+<a class="sourceLine" id="cb6-24" title="24">    o64 <span class="kw">sysret</span></a></code></pre></div>
+<p>We should not pop the rax register because we want to keep its value.</p>
+<p>Then the syscall_higher_handler manages which syscall to call from the rax register (which stores the syscall id).</p>
+<h3 id="how-userspace-call-the-syscall">How userspace call the syscall ?</h3>
+<p>It’s like interrupt but we replace <code>int $127</code> with <code>syscall</code>. We also need to change the asm code to push and pop R11 and RCX registers, because they keep their values (RCX for RIP and R11 for RFLAGS).</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode cpp"><code class="sourceCode cpp"><a class="sourceLine" id="cb7-1" title="1"><span class="kw">inline</span> <span class="dt">uint64_t</span> syscall(<span class="dt">uint64_t</span> syscall_id, <span class="dt">uint64_t</span> arg1, <span class="dt">uint64_t</span> arg2, <span class="dt">uint64_t</span> arg3, <span class="dt">uint64_t</span> arg4)</a>
+<a class="sourceLine" id="cb7-2" title="2">{</a>
+<a class="sourceLine" id="cb7-3" title="3">    <span class="dt">uint64_t</span> syscall_return = <span class="dv">0</span>;</a>
+<a class="sourceLine" id="cb7-4" title="4">    <span class="kw">asm</span> <span class="at">volatile</span>(</a>
+<a class="sourceLine" id="cb7-5" title="5">        <span class="st">&quot;push r11 </span><span class="sc">\n</span><span class="st">&quot;</span></a>
+<a class="sourceLine" id="cb7-6" title="6">        <span class="st">&quot;push rcx </span><span class="sc">\n</span><span class="st">&quot;</span></a>
+<a class="sourceLine" id="cb7-7" title="7">        <span class="st">&quot;syscall </span><span class="sc">\n</span><span class="st">&quot;</span></a>
+<a class="sourceLine" id="cb7-8" title="8">        <span class="st">&quot;pop rcx </span><span class="sc">\n</span><span class="st">&quot;</span></a>
+<a class="sourceLine" id="cb7-9" title="9">        <span class="st">&quot;pop r11 </span><span class="sc">\n</span><span class="st">&quot;</span></a>
+<a class="sourceLine" id="cb7-10" title="10">        : <span class="st">&quot;=a&quot;</span>(syscall_return)</a>
+<a class="sourceLine" id="cb7-11" title="11">        : <span class="st">&quot;a&quot;</span>(syscall_id), <span class="st">&quot;b&quot;</span>(arg1), <span class="st">&quot;d&quot;</span>(arg2), <span class="st">&quot;S&quot;</span>(arg3), <span class="st">&quot;D&quot;</span>(arg4)</a>
+<a class="sourceLine" id="cb7-12" title="12">        : <span class="st">&quot;memory&quot;</span>);</a>
+<a class="sourceLine" id="cb7-13" title="13">    <span class="cf">return</span> syscall_return;</a>
+<a class="sourceLine" id="cb7-14" title="14">}</a></code></pre></div>
+<p>Et voila ! This was how syscall/sysret was implemented in wingos!</p>
+<h5>
+    written by supercyp on 29 May 2021
+</h5>
+<h6>
+    <a href="index.html">
+        back to index </a>
+</h6>
+
+</body>
+
+</html>
