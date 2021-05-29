@@ -3,12 +3,12 @@
 > if you find one do not hesitate to make an issue or a pr to [github.com/supercip971/supercip971.github.io](https://github.com/Supercip971/supercip971.github.io) <3
 
 
-## What is a syscall ?
+## What is a syscall?
 
 Syscalls allow to execute kernel actions from userspace. They are like complex *functions* that link the program and the kernel.
-For example we can have a syscall to allocate memory, one to open a file... This is an important part of the kernel that needs to be very fast because a user applications can call a lot of syscall.  
+For example we can have a syscall to allocate memory, one to open a file... This is an important part of the kernel that needs to be very fast because a user applications can call a lot of syscalls.  
 
-## What were we doing before for syscalls ?
+## What were we doing before for syscalls?
 
 Before (and some are still using it, and it's still quite effective) we used the interrupts of the cpu: the interrupt allows you to go directly to the kernel by executing specific code pointed in the interrupt table. 
 The `int` instruction allows to call a certain interrupt, for exemple we can use `int 68` for calling interrupts number 67. 
@@ -25,7 +25,7 @@ However interruptions are slow for syscall. It needs to check a lot of things an
 
 Sysenter and Sysexit were added by intel.
 One problem of sysenter and sysexit in 32Bit is that we don't know if it is supported. The instruction may not be available.
-Another problem of sysenter is that you must write for each syscall the return address to RDX and the return stack to RCX, that's fine but you don't know what the RIP and RSP of the syscall is ! 
+Another problem of sysenter is that you must write for each syscall the return address to RDX and the return stack to RCX, that's fine but you don't know what the RIP and RSP of the syscall is! 
 
 The user app must put a return address and a return stack to syscall parameters themselves:
 
@@ -43,15 +43,15 @@ return_addr:
 I think it is sketchy and can be the cause of error. This is my opinion, but I think syscall/sysret are 100 times better than sysenter/sysexit.
 
 
-## What is syscall & sysret ?
+## What are syscall & sysret?
 
-First what is syscall & sysret ? 
+First what are syscall & sysret? 
 
 Syscall and sysret are long mode instruction for doing syscall from userspace to the kernel.
 These instructions allow you to make faster and safer syscalls.
 They are faster thanks to the fact that it takes into account that it has consistent segments.
 
-### Faster certainly but what is the gain in performance ? 
+### Faster certainly but what is the gain in performance? 
 
 I wanted to test on *GNU/* linux the syscall "Getpid", with an interrupt and with the syscall instruction (using g++ -O3, and google benchmarks)
 
@@ -86,7 +86,7 @@ __here are the results:__
 
 the syscall is 2 times faster than the interrupt!
 
-note: I have a ryzen 5 3600X so results can be differents on other cpu's and systems
+note: I have a ryzen 5 3600X so results can be different on other cpus and systems
 
 however setting up a syscall is a bit more complicated than setting up a syscall with an interrupt:
 
@@ -180,7 +180,7 @@ We should not pop the rax register because we want to keep its value.
 
 Then the syscall_higher_handler manages which syscall to call from the rax register (which stores the syscall id).
 
-### How userspace call the syscall ?
+### How userspace call the syscall?
 
 It's like interrupt but we replace `int $127` with `syscall`.
 We also need to change the asm code to push and pop R11 and RCX registers, because they keep their values (RCX for RIP and R11 for RFLAGS).
@@ -202,4 +202,4 @@ inline uint64_t syscall(uint64_t syscall_id, uint64_t arg1, uint64_t arg2, uint6
 }
 ```
 
-Et voila ! This was how syscall/sysret was implemented in wingos!
+Et voila! This was how syscall/sysret was implemented in wingos!
