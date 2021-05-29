@@ -16,9 +16,9 @@
     </h1><blockquote>
 <p>note: the article may contain errors, of spellings, codes, or others… if you find one do not hesitate to make an issue or a pr to <a href="https://github.com/Supercip971/supercip971.github.io">github.com/supercip971/supercip971.github.io</a> &lt;3</p>
 </blockquote>
-<h2 id="what-is-a-syscall">What is a syscall ?</h2>
-<p>Syscalls allow to execute kernel actions from userspace. They are like complex <em>functions</em> that link the program and the kernel. For example we can have a syscall to allocate memory, one to open a file… This is an important part of the kernel that needs to be very fast because a user applications can call a lot of syscall.</p>
-<h2 id="what-were-we-doing-before-for-syscalls">What were we doing before for syscalls ?</h2>
+<h2 id="what-is-a-syscall">What is a syscall?</h2>
+<p>Syscalls allow to execute kernel actions from userspace. They are like complex <em>functions</em> that link the program and the kernel. For example we can have a syscall to allocate memory, one to open a file… This is an important part of the kernel that needs to be very fast because a user applications can call a lot of syscalls.</p>
+<h2 id="what-were-we-doing-before-for-syscalls">What were we doing before for syscalls?</h2>
 <p>Before (and some are still using it, and it’s still quite effective) we used the interrupts of the cpu: the interrupt allows you to go directly to the kernel by executing specific code pointed in the interrupt table. The <code>int</code> instruction allows to call a certain interrupt, for exemple we can use <code>int 68</code> for calling interrupts number 67. Some os reserve an interruption for the syscall (wingos used interrupt 127, linux use 128…) this interrupt may be the only interrupt that a RING 3 process can call. In the interrupt handler the registers are saved and used as arguments for the syscall.</p>
 <blockquote>
 <p>note: all registers can be used, but RCX and R11 should not be used (if we want to easily make the kernel portable to 64bit syscall/sysret) because they are needed to save the cpu state with the <code>syscall</code> instruction</p>
@@ -26,7 +26,7 @@
 <p>After the execution of the syscall code in the interrupt, we can modify the value of the RAX register so that it contains the syscall return value.</p>
 <p>However interruptions are slow for syscall. It needs to check a lot of things and it’s not the best solution available.</p>
 <h2 id="before-syscall-sysret-sysenter-sysexit">Before syscall &amp; sysret: sysenter &amp; sysexit</h2>
-<p>Sysenter and Sysexit were added by intel. One problem of sysenter and sysexit in 32Bit is that we don’t know if it is supported. The instruction may not be available. Another problem of sysenter is that you must write for each syscall the return address to RDX and the return stack to RCX, that’s fine but you don’t know what the RIP and RSP of the syscall is !</p>
+<p>Sysenter and Sysexit were added by intel. One problem of sysenter and sysexit in 32Bit is that we don’t know if it is supported. The instruction may not be available. Another problem of sysenter is that you must write for each syscall the return address to RDX and the return stack to RCX, that’s fine but you don’t know what the RIP and RSP of the syscall is!</p>
 <p>The user app must put a return address and a return stack to syscall parameters themselves:</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode nasm"><code class="sourceCode nasm"><a class="sourceLine" id="cb1-1" title="1"><span class="fu">sysenter_is_bad_imo:</span></a>
 <a class="sourceLine" id="cb1-2" title="2">    <span class="kw">mov</span> rcx, return_addr</a>
@@ -37,10 +37,10 @@
 <a class="sourceLine" id="cb1-7" title="7"><span class="fu">return_addr:</span></a>
 <a class="sourceLine" id="cb1-8" title="8">    <span class="kw">ret</span></a></code></pre></div>
 <p>I think it is sketchy and can be the cause of error. This is my opinion, but I think syscall/sysret are 100 times better than sysenter/sysexit.</p>
-<h2 id="what-is-syscall-sysret">What is syscall &amp; sysret ?</h2>
-<p>First what is syscall &amp; sysret ?</p>
+<h2 id="what-are-syscall-sysret">What are syscall &amp; sysret?</h2>
+<p>First what are syscall &amp; sysret?</p>
 <p>Syscall and sysret are long mode instruction for doing syscall from userspace to the kernel. These instructions allow you to make faster and safer syscalls. They are faster thanks to the fact that it takes into account that it has consistent segments.</p>
-<h3 id="faster-certainly-but-what-is-the-gain-in-performance">Faster certainly but what is the gain in performance ?</h3>
+<h3 id="faster-certainly-but-what-is-the-gain-in-performance">Faster certainly but what is the gain in performance?</h3>
 <p>I wanted to test on <em>GNU/</em> linux the syscall “Getpid”, with an interrupt and with the syscall instruction (using g++ -O3, and google benchmarks)</p>
 <p>source code:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode cpp"><code class="sourceCode cpp"><a class="sourceLine" id="cb2-1" title="1"><span class="pp">#include </span><span class="im">&lt;benchmark/benchmark.h&gt;</span></a>
@@ -80,7 +80,7 @@
 </tbody>
 </table>
 <p>the syscall is 2 times faster than the interrupt!</p>
-<p>note: I have a ryzen 5 3600X so results can be differents on other cpu’s and systems</p>
+<p>note: I have a ryzen 5 3600X so results can be different on other cpus and systems</p>
 <p>however setting up a syscall is a bit more complicated than setting up a syscall with an interrupt:</p>
 <p>first you need to turn them on with model specific register (address 0xC0000080 bit 0)</p>
 <p>then you need to setup syscall gdt segments:</p>
@@ -138,7 +138,7 @@
 <a class="sourceLine" id="cb6-24" title="24">    o64 <span class="kw">sysret</span></a></code></pre></div>
 <p>We should not pop the rax register because we want to keep its value.</p>
 <p>Then the syscall_higher_handler manages which syscall to call from the rax register (which stores the syscall id).</p>
-<h3 id="how-userspace-call-the-syscall">How userspace call the syscall ?</h3>
+<h3 id="how-userspace-call-the-syscall">How userspace call the syscall?</h3>
 <p>It’s like interrupt but we replace <code>int $127</code> with <code>syscall</code>. We also need to change the asm code to push and pop R11 and RCX registers, because they keep their values (RCX for RIP and R11 for RFLAGS).</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode cpp"><code class="sourceCode cpp"><a class="sourceLine" id="cb7-1" title="1"><span class="kw">inline</span> <span class="dt">uint64_t</span> syscall(<span class="dt">uint64_t</span> syscall_id, <span class="dt">uint64_t</span> arg1, <span class="dt">uint64_t</span> arg2, <span class="dt">uint64_t</span> arg3, <span class="dt">uint64_t</span> arg4)</a>
 <a class="sourceLine" id="cb7-2" title="2">{</a>
@@ -154,7 +154,7 @@
 <a class="sourceLine" id="cb7-12" title="12">        : <span class="st">&quot;memory&quot;</span>);</a>
 <a class="sourceLine" id="cb7-13" title="13">    <span class="cf">return</span> syscall_return;</a>
 <a class="sourceLine" id="cb7-14" title="14">}</a></code></pre></div>
-<p>Et voila ! This was how syscall/sysret was implemented in wingos!</p>
+<p>Et voila! This was how syscall/sysret was implemented in wingos!</p>
 <h5>
     written by supercyp on 29 May 2021
 </h5>
